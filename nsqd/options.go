@@ -1,0 +1,113 @@
+package nsqd
+
+import (
+	"crypto/md5"
+	"github.com/bowen/mynsq/internal/lg"
+	"hash/crc32"
+	"io"
+	"log"
+	"os"
+	"time"
+)
+
+type Options struct {
+	// basic options
+	ID        int64       `flag:"node-id" cfg:"id"`
+	LogLevel  lg.LogLevel `flag:"log-level"`
+	LogPrefix string      `flag:"log-prefix"`
+	Logger    Logger
+
+	TCPAddress               string        `flag:"tcp-address"`
+	BroadcastAddress         string        `flag:"broadcast-address"`
+	BroadcastTCPPort         int           `flag:"broadcast-tcp-port"`
+	BroadcastHTTPPort        int           `flag:"broadcast-http-port"`
+	NSQLookupdTCPAddresses   []string      `flag:"lookupd-tcp-address" cfg:"nsqlookupd_tcp_addresses"`
+	HTTPClientConnectTimeout time.Duration `flag:"http-client-connect-timeout" cfg:"http_client_connect_timeout"`
+	HTTPClientRequestTimeout time.Duration `flag:"http-client-request-timeout" cfg:"http_client_request_timeout"`
+
+	// diskqueue options
+	DataPath        string        `flag:"data-path"`
+	MemQueueSize    int64         `flag:"mem-queue-size"`
+	MaxBytesPerFile int64         `flag:"max-bytes-per-file"`
+	SyncEvery       int64         `flag:"sync-every"`
+	SyncTimeout     time.Duration `flag:"sync-timeout"`
+
+	QueueScanInterval        time.Duration
+	QueueScanRefreshInterval time.Duration
+	QueueScanSelectionCount  int `flag:"queue-scan-selection-count"`
+	QueueScanWorkerPoolMax   int `flag:"queue-scan-worker-pool-max"`
+	QueueScanDirtyPercent    float64
+
+	// msg and command options
+	MsgTimeout    time.Duration `flag:"msg-timeout"`
+	MaxMsgTimeout time.Duration `flag:"max-msg-timeout"`
+	MaxMsgSize    int64         `flag:"max-msg-size"`
+	MaxBodySize   int64         `flag:"max-body-size"`
+	MaxReqTimeout time.Duration `flag:"max-req-timeout"`
+	ClientTimeout time.Duration  //default 60s
+
+	// client overridable configuration options
+	MaxHeartbeatInterval   time.Duration `flag:"max-heartbeat-interval"`
+	MaxRdyCount            int64         `flag:"max-rdy-count"`
+	MaxOutputBufferSize    int64         `flag:"max-output-buffer-size"`
+	MaxOutputBufferTimeout time.Duration `flag:"max-output-buffer-timeout"`
+	MinOutputBufferTimeout time.Duration `flag:"min-output-buffer-timeout"`
+	OutputBufferTimeout    time.Duration `flag:"output-buffer-timeout"`
+	MaxChannelConsumers    int           `flag:"max-channel-consumers"`
+
+
+}
+
+func NewOptions() *Options {
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	h := md5.New()
+	io.WriteString(h, hostname)
+	defaultID := int64(crc32.ChecksumIEEE(h.Sum(nil)) % 1024)
+
+	return &Options{
+		ID:        defaultID,
+		LogPrefix: "[nsqd] ",
+		LogLevel:  lg.INFO,
+
+		TCPAddress:        "0.0.0.0:4150",
+		BroadcastAddress:  hostname,
+		BroadcastTCPPort:  0,
+		BroadcastHTTPPort: 0,
+
+		NSQLookupdTCPAddresses: make([]string, 0),
+
+		HTTPClientConnectTimeout: 2 * time.Second,
+		HTTPClientRequestTimeout: 5 * time.Second,
+
+		MemQueueSize:    10000,
+		MaxBytesPerFile: 100 * 1024 * 1024,
+		SyncEvery:       2500,
+		SyncTimeout:     2 * time.Second,
+
+		QueueScanInterval:        100 * time.Millisecond,
+		QueueScanRefreshInterval: 5 * time.Second,
+		QueueScanSelectionCount:  20,
+		QueueScanWorkerPoolMax:   4,
+		QueueScanDirtyPercent:    0.25,
+
+		MsgTimeout:    60 * time.Second,
+		MaxMsgTimeout: 15 * time.Minute,
+		MaxMsgSize:    1024 * 1024,
+		MaxBodySize:   5 * 1024 * 1024,
+		MaxReqTimeout: 1 * time.Hour,
+		ClientTimeout: 60 * time.Second,
+
+		MaxHeartbeatInterval:   60 * time.Second,
+		MaxRdyCount:            2500,
+		MaxOutputBufferSize:    64 * 1024,
+		MaxOutputBufferTimeout: 30 * time.Second,
+		MinOutputBufferTimeout: 25 * time.Millisecond,
+		OutputBufferTimeout:    250 * time.Millisecond,
+		MaxChannelConsumers:    0,
+
+	}
+}
